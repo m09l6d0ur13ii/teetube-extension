@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "TeeTube Tracker",
+  "name": "TeeTube",
   "version": "1.0",
-  "description": "Tag YouTube videos with game categories and track player nicknames.",
+  "description": "View TeeTube tags directly on YouTube and tracking websites.",
   "permissions": [
     "storage",
     "tabs"
@@ -11,7 +11,7 @@
     "*://*.youtube.com/*"
   ],
   "action": {
-    "default_title": "Open Dashboard"
+    "default_title": "Open TeeTube Website"
   },
   "background": {
     "service_worker": "background.js"
