@@ -1,31 +1,44 @@
+// We define the URL of our database hosted on GitHub via jsDelivr CDN.
+// Note: jsDelivr might cache this for up to 12 hours. For instant updates, raw.githubusercontent.com is better.
 const DB_URL = 'https://cdn.jsdelivr.net/gh/m09l6d0ur13ii/teetube-db@main/database.json';
 
-// Fetch DB and store in local storage
+// This function fetches the latest database from the URL and saves it to local storage.
 async function updateDatabase() {
   try {
+    // We add a timestamp query parameter (?_=...) to try and bypass browser caching
     const res = await fetch(DB_URL + '?_=' + Date.now());
+    
+    // Check if the request was successful
     if (res.ok) {
+      // Parse the JSON response
       const db = await res.json();
+      
+      // If the database has a 'videos' object, save it to the browser's local storage
       if (db && db.videos) {
         chrome.storage.local.set({ videos: db.videos });
       }
     }
   } catch (e) {
+    // If something goes wrong (e.g. no internet), log the error
     console.error('TeeTube: Failed to update database', e);
   }
 }
 
-// Update DB on startup and every hour
+// We want to fetch the database as soon as the extension starts or is installed
 chrome.runtime.onStartup.addListener(updateDatabase);
 chrome.runtime.onInstalled.addListener(updateDatabase);
+
+// We also set an interval to update the database every 1 hour (60 minutes * 60 seconds * 1000 milliseconds)
 setInterval(updateDatabase, 60 * 60 * 1000);
 
-// Open main website when clicking the extension icon or banner
+// When the user clicks the extension icon in the toolbar, open the main TeeTube website in a new tab
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: 'https://m09l6d0ur13ii.github.io/teetube/' });
 });
 
+// Listen for messages from our content scripts (like when a user clicks a tracker banner)
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  // If the action is 'openDashboard', open the main website
   if (req.action === 'openDashboard') {
     chrome.tabs.create({ url: 'https://m09l6d0ur13ii.github.io/teetube/' });
   }
