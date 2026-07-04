@@ -1,4 +1,4 @@
-#ddnettube-panel {
+#ddnettube-readonly-panel {
   margin-top: 12px;
   padding: 12px;
   background-color: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.1));
@@ -48,13 +48,16 @@
   left: 4px;
   background-color: #2ecc71;
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
   z-index: 9999;
   box-shadow: 0 1px 3px rgba(0,0,0,0.5);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .ddnettube-tag:hover {

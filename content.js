@@ -2,9 +2,10 @@
 // For example, under "game", it could be ddnet or teeworlds.
 const CATEGORIES = {
   game: ["ddnet", "teeworlds", "ddper"],
-  video: ["moment", "montage", "прохождение", "speedrun", "t0speedrun", "tutorial", "trailer", "skips", "fun", "meme", "other"],
-  mode: ["ddrace", "ctf", "dm", "race", "fng", "gores", "block", "other mods"],
-  gameplayer: ["real", "tas"]
+  video: ["moment", "montage", "playthrough", "speedrun", "t0speedrun", "tutorial", "trailer", "skips", "animation", "gameplay", "tournament", "match", "podcast", "fun", "meme", "other"],
+  mode: ["DDRace", "Gores", "fng", "F-DDrace", "Race", "Block", "BOMB", "CTF", "TB", "TeeWare", "InfClass", "Monster", "zCatch", "Foot", "DM", "Soup", "AXRace", "Sheep", "Battle", "Training", "other mods"],
+  gameplayer: ["real", "tas", "dummy"],
+  lang: ["ru", "en", "zh", "other"]
 };
 
 // We keep track of the current YouTube video ID here.
@@ -19,6 +20,16 @@ function getVideoId() {
   return urlParams.get('v');
 }
 
+// Helper to prevent XSS
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 
 
 // We listen for changes in the browser's local storage.
@@ -28,19 +39,28 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     // If we are currently watching a video and the database just updated, 
     // re-run the init() function to refresh the panel.
     if (currentVideoId) init();
+
+    if (typeof allVideosCache !== 'undefined') {
+      allVideosCache = changes.videos.newValue || {};
+      if (typeof injectThumbnails === 'function') injectThumbnails();
+    }
   }
 });
 
 // --- Render Read-Only Panel ---
 // This big function creates the UI panel under the YouTube video title.
 function renderPanel() {
+  // If the admin extension is running, it will inject 'ddnettube-panel'.
+  // We should not render the read-only panel if the admin is active!
+  if (document.getElementById('ddnettube-panel')) return;
+
   // First, let's see if our panel already exists on the page.
-  let panel = document.getElementById('ddnettube-panel');
+  let panel = document.getElementById('ddnettube-readonly-panel');
   
   if (!panel) {
     // If it doesn't exist, we create a new div for it.
     panel = document.createElement('div');
-    panel.id = 'ddnettube-panel';
+    panel.id = 'ddnettube-readonly-panel';
 
     // We try to find the video title container on YouTube to insert our panel right below it.
     const titleContainer = document.querySelector('ytd-watch-metadata #title') || document.querySelector('h1.title')?.parentElement;
@@ -99,7 +119,7 @@ function renderPanel() {
     currentData.players.forEach(nick => {
       const nickEl = document.createElement('div');
       nickEl.className = 'ddnettube-nickname';
-      nickEl.innerText = nick;
+      nickEl.innerText = nick; // InnerText is safe, but we'll use esc just to be consistent if it was innerHTML, but wait innerText is already safe!
       nickRow.appendChild(nickEl);
     });
     panel.appendChild(nickRow);
@@ -148,7 +168,7 @@ function init() {
   const vid = getVideoId();
   // If there's no video ID, hide the panel and stop.
   if (!vid) {
-    const panel = document.getElementById('ddnettube-panel');
+    const panel = document.getElementById('ddnettube-readonly-panel');
     if (panel) panel.remove();
     currentVideoId = null;
     return;
@@ -180,7 +200,7 @@ function init() {
           renderPanel();
         } else {
           // If the video isn't in our DB, make sure the panel is hidden.
-          const panel = document.getElementById('ddnettube-panel');
+          const panel = document.getElementById('ddnettube-readonly-panel');
           if (panel) panel.style.display = 'none';
         }
       }
@@ -335,4 +355,54 @@ function injectTrackerBanner(type, targetName, matchCount) {
     // Put it right at the top!
     container.insertBefore(banner, container.firstChild);
   }
+}
+
+// --- Thumbnail Badges ---
+let allVideosCache = {};
+chrome.storage.local.get(['videos'], (res) => {
+  allVideosCache = res.videos || {};
+  if (window.location.hostname.includes('youtube.com')) {
+    injectThumbnails();
+  }
+});
+
+function injectThumbnails() {
+  const links = document.querySelectorAll('a[href*="/watch?v="]');
+  links.forEach(link => {
+    try {
+      const url = new URL(link.href);
+      const vid = url.searchParams.get('v');
+      if (!vid) return;
+
+      // Check if it's a thumbnail link (contains an image or has a thumbnail-related class/id)
+      const hasImage = link.querySelector('img, yt-image, yt-thumbnail-view-model');
+      const isThumbnail = link.id === 'thumbnail' || (typeof link.className === 'string' && (link.className.includes('thumbnail') || link.className.includes('ytLockupViewModelContentImage')));
+      
+      if (!hasImage && !isThumbnail) {
+        // If it's a title link, we might have accidentally added a badge to it previously. Remove it.
+        const wrongBadge = link.querySelector('.teetube-saved-badge');
+        if (wrongBadge) wrongBadge.remove();
+        return;
+      }
+
+      const existingBadge = link.querySelector('.teetube-saved-badge');
+      
+      if (allVideosCache[vid]) {
+         if (!existingBadge) {
+             const badge = document.createElement('div');
+             badge.className = 'teetube-saved-badge';
+             badge.innerHTML = '✔ teetube';
+             const thumb = link.querySelector('yt-thumbnail-view-model') || link.querySelector('ytd-thumbnail') || link;
+             thumb.style.position = 'relative';
+             thumb.appendChild(badge);
+         }
+      } else {
+         if (existingBadge) existingBadge.remove();
+      }
+    } catch (e) {}
+  });
+}
+
+if (window.location.hostname.includes('youtube.com')) {
+  setInterval(injectThumbnails, 1500);
 }
