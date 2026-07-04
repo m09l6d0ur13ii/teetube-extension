@@ -249,8 +249,8 @@ if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw') || hostnam
 
 // This function figures out what player, map, or clan page we are looking at.
 function initTrackerIntegration(hostname) {
-  // Remove any old banner first.
-  const existing = document.getElementById('teetube-tracker-banner');
+  // Remove any old badge first.
+  const existing = document.getElementById('teetube-tracker-badge');
   if (existing) existing.remove();
 
   const path = window.location.pathname;
@@ -298,62 +298,114 @@ function initTrackerIntegration(hostname) {
       if (type === 'clan' && v.clans && v.clans.includes(targetName)) matchCount++;
     });
 
-    // Finally, inject the banner onto the page with the result!
+    // Finally, inject the badge onto the page with the result!
     injectTrackerBanner(type, targetName, matchCount);
   });
 }
 
-// This function creates the actual HTML element for the tracker banner and inserts it.
+// This function creates the actual HTML element for the tracker badge and inserts it.
 function injectTrackerBanner(type, targetName, matchCount) {
-  const banner = document.createElement('div');
-  banner.id = 'teetube-tracker-banner';
-  // Add some nice styling so it looks good!
-  banner.style.padding = '12px 20px';
-  banner.style.textAlign = 'center';
-  banner.style.fontWeight = 'bold';
-  banner.style.fontSize = '16px';
-  banner.style.fontFamily = 'sans-serif';
-  banner.style.margin = '20px auto';
-  banner.style.maxWidth = '800px';
-  banner.style.borderRadius = '8px';
-  banner.style.cursor = 'pointer';
-  banner.style.transition = 'opacity 0.2s';
-  banner.style.position = 'relative';
-  banner.style.zIndex = '9999';
+  const badge = document.createElement('span');
+  badge.id = 'teetube-tracker-badge';
+  badge.title = 'TeeTube';
 
-  // Translate the type into Russian for the user interface
-  const typeText = type === 'player' ? 'этим игроком' : (type === 'clan' ? 'этим кланом' : 'этой картой');
+  const hostname = window.location.hostname;
+  const isDDNet = hostname.includes('ddnet.org');
+  const isDDStats = hostname.includes('ddstats.tw');
+  const isTeeRank = hostname.includes('teerank.io');
+  
+  // Basic inline badge styles
+  badge.style.display = 'inline-block';
+  badge.style.marginLeft = '12px';
+  badge.style.padding = '2px 8px';
+  badge.style.fontSize = '14px';
+  badge.style.fontWeight = 'bold';
+  badge.style.borderRadius = '6px';
+  badge.style.verticalAlign = 'middle';
+  badge.style.lineHeight = '1.5';
+  badge.style.transition = 'all 0.2s';
 
   if (matchCount > 0) {
-    // If we found videos, make the banner green!
-    banner.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
-    banner.style.border = '2px solid #2ecc71';
-    banner.style.color = '#2ecc71';
-    banner.innerHTML = `📺 Найдено ${matchCount} видео на TeeTube! Нажмите, чтобы открыть базу.`;
-    
-    // When clicked, tell the background script to open the dashboard with these filters.
-    banner.onclick = () => {
+    badge.style.cursor = 'pointer';
+    badge.innerHTML = `📺 ${matchCount} видео`;
+    badge.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       chrome.runtime.sendMessage({ action: 'openDashboard', type, targetName });
     };
   } else {
-    // If no videos were found, make it red.
-    banner.style.backgroundColor = 'rgba(255, 50, 50, 0.2)';
-    banner.style.border = '2px solid #ff3232';
-    banner.style.color = '#ff8282';
-    banner.innerHTML = `🚫 На TeeTube пока нет видео с ${typeText}.`;
-    
-    // Clicking still opens the dashboard, just without filters.
-    banner.onclick = () => {
-      chrome.runtime.sendMessage({ action: 'openDashboard' });
-    };
+    badge.style.cursor = 'default';
+    badge.innerHTML = `🚫 0 видео`;
   }
 
-  // Find a good place on the page to insert the banner.
-  // We check a few common container IDs used by DDNet and DDStats.
-  let container = document.querySelector('#content > .block') || document.querySelector('main') || document.querySelector('#app') || document.body;
-  if (container) {
-    // Put it right at the top!
-    container.insertBefore(banner, container.firstChild);
+  if (isDDNet) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #ffa500';
+      badge.style.color = '#ffa500';
+      badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
+      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.2)';
+      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
+    } else {
+      badge.style.border = '1px solid #888';
+      badge.style.color = '#888';
+      badge.style.backgroundColor = 'rgba(136, 136, 136, 0.1)';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('.block7 h2') || document.querySelector('h2');
+    if (targetEl) targetEl.appendChild(badge);
+  } else if (isDDStats) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid rgba(46, 204, 113, 0.5)';
+      badge.style.color = '#2ecc71';
+      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
+      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.25)';
+      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
+    } else {
+      badge.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+      badge.style.color = '#e0e0ff';
+      badge.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+      badge.style.opacity = '0.7';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3, div.text-2xl, span.text-2xl'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
+    if (targetEl) targetEl.appendChild(badge);
+  } else if (isTeeRank) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #34d399';
+      badge.style.color = '#065f46';
+      badge.style.backgroundColor = '#d1fae5';
+      badge.onmouseenter = () => badge.style.backgroundColor = '#a7f3d0';
+      badge.onmouseleave = () => badge.style.backgroundColor = '#d1fae5';
+    } else {
+      badge.style.border = '1px solid #d1d5db';
+      badge.style.color = '#6b7280';
+      badge.style.backgroundColor = '#f3f4f6';
+    }
+    
+    let targetEl = Array.from(document.querySelectorAll('h1')).find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1.text-2xl') || document.querySelector('h1');
+    
+    if (type === 'map') {
+      // TeeRank map pages don't have an h1, so we attach the badge to the breadcrumb link.
+      const links = Array.from(document.querySelectorAll('a'));
+      const breadcrumb = links.find(a => a.textContent.trim().toLowerCase() === targetName.toLowerCase());
+      if (breadcrumb) targetEl = breadcrumb;
+    }
+    
+    if (targetEl) targetEl.appendChild(badge);
+  } else {
+    // Fallback
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #2ecc71';
+      badge.style.color = '#2ecc71';
+      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
+    } else {
+      badge.style.border = '1px solid #ff3232';
+      badge.style.color = '#ff8282';
+      badge.style.backgroundColor = 'rgba(255, 50, 50, 0.2)';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
+    if (targetEl) targetEl.appendChild(badge);
   }
 }
 
@@ -432,18 +484,23 @@ function injectChannelBadges() {
   
   channelEls.forEach(el => {
     try {
-      const author = el.innerText.trim();
+      let badge = el.querySelector('.teetube-channel-badge');
+      let rawText = el.innerText || el.textContent || '';
+      if (badge) {
+        rawText = rawText.replace(badge.innerText || badge.textContent, '');
+      }
+      const author = rawText.trim();
+      
       if (!author) return;
       const lowerAuthor = author.toLowerCase();
       
       const count = authorCounts[lowerAuthor];
       if (!count) {
-        const wrongBadge = el.querySelector('.teetube-channel-badge');
-        if (wrongBadge) wrongBadge.remove();
+        if (badge) badge.remove();
         return;
       }
 
-      let badge = el.querySelector('.teetube-channel-badge');
+      // badge is already defined above
       
       let badgeText = `✔ teetube (${count} saved)`;
 

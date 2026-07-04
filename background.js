@@ -40,6 +40,10 @@ chrome.action.onClicked.addListener(() => {
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   // If the action is 'openDashboard', open the main website
   if (req.action === 'openDashboard') {
-    chrome.tabs.create({ url: 'https://m09l6d0ur13ii.github.io/teetube/' });
+    let url = 'https://m09l6d0ur13ii.github.io/teetube/';
+    if (req.type && req.targetName) {
+      url += `?${encodeURIComponent(req.type)}=${encodeURIComponent(req.targetName)}`;
+    }
+    chrome.tabs.create({ url });
   }
 });
