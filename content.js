@@ -247,6 +247,158 @@ if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw') || hostnam
   setTimeout(() => initTrackerIntegration(hostname), 500);
 }
 
+// This function figures out what player, map, or clan page we are looking at.
+function initTrackerIntegration(hostname) {
+  // Remove any old badge first.
+  const existing = document.getElementById('teetube-tracker-badge');
+  if (existing) existing.remove();
+
+  const path = window.location.pathname;
+  let type = null;
+  let targetName = null;
+
+  // Let's guess what page the user is on based on the URL!
+  if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw')) {
+    if (path.startsWith('/players/') || path.startsWith('/player/')) {
+      type = 'player';
+      targetName = decodeURIComponent(path.split('/')[2]);
+    } else if (path.startsWith('/maps/') || path.startsWith('/map/')) {
+      type = 'map';
+      targetName = decodeURIComponent(path.split('/')[2]);
+    }
+  } else if (hostname.includes('teerank.io')) {
+    if (path.startsWith('/player/')) {
+      type = 'player';
+      targetName = decodeURIComponent(path.split('/')[2]);
+    } else if (path.startsWith('/clan/')) {
+      type = 'clan';
+      targetName = decodeURIComponent(path.split('/')[2]);
+    }
+  }
+
+  // If we found a target, ask our local database how many videos we have for it.
+  if (type && targetName) {
+    chrome.storage.local.get(['videos'], (res) => {
+      const videos = res.videos || {};
+      let matchCount = 0;
+      
+      // Count how many videos have this target (e.g. this player or this map)
+      Object.values(videos).forEach(v => {
+        if (type === 'player' && v.players && v.players.includes(targetName)) matchCount++;
+        if (type === 'map' && v.maps && v.maps.includes(targetName)) matchCount++;
+        if (type === 'clan' && v.clans && v.clans.includes(targetName)) matchCount++;
+      });
+      
+      // Inject the badge to the page
+      injectTrackerBanner(type, targetName, matchCount);
+    });
+  }
+}
+
+function injectTrackerBanner(type, targetName, matchCount) {
+  const badge = document.createElement('div');
+  badge.id = 'teetube-tracker-badge';
+  
+  // Base styling for the badge
+  badge.style.display = 'inline-block';
+  badge.style.padding = '2px 8px';
+  badge.style.borderRadius = '12px';
+  badge.style.fontSize = '12px';
+  badge.style.fontWeight = 'bold';
+  badge.style.marginLeft = '12px';
+  badge.style.verticalAlign = 'middle';
+  badge.style.fontFamily = 'sans-serif';
+  badge.style.transition = 'all 0.2s';
+  
+  if (matchCount > 0) {
+    badge.innerText = `📺 ${matchCount} видео`;
+    badge.style.cursor = 'pointer';
+    badge.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      chrome.runtime.sendMessage({ action: 'openDashboard', type, targetName });
+    };
+  } else {
+    badge.innerText = `🚫 0 видео`;
+    badge.style.cursor = 'default';
+  }
+
+  const hostname = window.location.hostname;
+  const isDDNet = hostname.includes('ddnet.org');
+  const isDDStats = hostname.includes('ddstats.tw');
+  const isTeeRank = hostname.includes('teerank.io');
+
+  if (isDDNet) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #ffa500';
+      badge.style.color = '#ffa500';
+      badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
+      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.2)';
+      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
+    } else {
+      badge.style.border = '1px solid #888';
+      badge.style.color = '#888';
+      badge.style.backgroundColor = 'rgba(136, 136, 136, 0.1)';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('.block7 h2') || document.querySelector('h2');
+    if (targetEl) targetEl.appendChild(badge);
+  } else if (isDDStats) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid rgba(46, 204, 113, 0.5)';
+      badge.style.color = '#2ecc71';
+      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
+      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.25)';
+      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
+    } else {
+      badge.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+      badge.style.color = '#e0e0ff';
+      badge.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+      badge.style.opacity = '0.7';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3, div.text-2xl, span.text-2xl'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
+    if (targetEl) targetEl.appendChild(badge);
+  } else if (isTeeRank) {
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #34d399';
+      badge.style.color = '#065f46';
+      badge.style.backgroundColor = '#d1fae5';
+      badge.onmouseenter = () => badge.style.backgroundColor = '#a7f3d0';
+      badge.onmouseleave = () => badge.style.backgroundColor = '#d1fae5';
+    } else {
+      badge.style.border = '1px solid #d1d5db';
+      badge.style.color = '#6b7280';
+      badge.style.backgroundColor = '#f3f4f6';
+    }
+    
+    let targetEl = Array.from(document.querySelectorAll('h1')).find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1.text-2xl') || document.querySelector('h1');
+    
+    if (type === 'map') {
+      // TeeRank map pages don't have an h1, so we attach the badge to the breadcrumb link.
+      const links = Array.from(document.querySelectorAll('a'));
+      const breadcrumb = links.find(a => a.textContent.trim().toLowerCase() === targetName.toLowerCase());
+      if (breadcrumb) targetEl = breadcrumb;
+    }
+    
+    if (targetEl) targetEl.appendChild(badge);
+  } else {
+    // Fallback
+    if (matchCount > 0) {
+      badge.style.border = '1px solid #2ecc71';
+      badge.style.color = '#2ecc71';
+      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
+    } else {
+      badge.style.border = '1px solid #ff3232';
+      badge.style.color = '#ff8282';
+      badge.style.backgroundColor = 'rgba(255, 50, 50, 0.2)';
+    }
+    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
+    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
+    if (targetEl) targetEl.appendChild(badge);
+  }
+}
+
 // --- Thumbnail Badges ---
 let allVideosCache = {};
 let authorCounts = {};
