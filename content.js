@@ -359,14 +359,30 @@ function injectTrackerBanner(type, targetName, matchCount) {
 
 // --- Thumbnail Badges ---
 let allVideosCache = {};
+let authorCounts = {};
+
+function updateAuthorCounts() {
+  authorCounts = {};
+  Object.values(allVideosCache).forEach(v => {
+    if (v.author) {
+      const author = v.author.trim().toLowerCase();
+      authorCounts[author] = (authorCounts[author] || 0) + 1;
+    }
+  });
+}
+
 chrome.storage.local.get(['videos'], (res) => {
   allVideosCache = res.videos || {};
+  updateAuthorCounts();
   if (window.location.hostname.includes('youtube.com')) {
     injectThumbnails();
+    injectChannelBadges();
   }
 });
 
 function injectThumbnails() {
+  if (document.getElementById('ddnettube-admin-active')) return;
+  
   const links = document.querySelectorAll('a[href*="/watch?v="]');
   links.forEach(link => {
     try {
@@ -393,7 +409,6 @@ function injectThumbnails() {
              badge.className = 'teetube-saved-badge';
              badge.innerHTML = '✔ teetube';
              const thumb = link.querySelector('yt-thumbnail-view-model') || link.querySelector('ytd-thumbnail') || link;
-             thumb.style.position = 'relative';
              thumb.appendChild(badge);
          }
       } else {
@@ -403,6 +418,48 @@ function injectThumbnails() {
   });
 }
 
+function injectChannelBadges() {
+  if (document.getElementById('ddnettube-admin-active')) return;
+
+  const channelEls = document.querySelectorAll(`
+    ytd-channel-name yt-formatted-string#text,
+    #channel-name yt-formatted-string#text,
+    yt-page-header-view-model h1.dynamicTextViewModelH1 span,
+    ytd-video-meta-block .ytContentMetadataViewModelMetadataText,
+    ytd-channel-name .ytContentMetadataViewModelMetadataText,
+    #channel-name .ytContentMetadataViewModelMetadataText
+  `);
+  
+  channelEls.forEach(el => {
+    try {
+      const author = el.innerText.trim();
+      if (!author) return;
+      const lowerAuthor = author.toLowerCase();
+      
+      const count = authorCounts[lowerAuthor];
+      if (!count) {
+        const wrongBadge = el.querySelector('.teetube-channel-badge');
+        if (wrongBadge) wrongBadge.remove();
+        return;
+      }
+
+      let badge = el.querySelector('.teetube-channel-badge');
+      
+      let badgeText = `✔ teetube (${count} saved)`;
+
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'teetube-channel-badge';
+        el.appendChild(badge);
+      }
+      badge.innerHTML = badgeText;
+    } catch (e) {}
+  });
+}
+
 if (window.location.hostname.includes('youtube.com')) {
-  setInterval(injectThumbnails, 1500);
+  setInterval(() => {
+    injectThumbnails();
+    injectChannelBadges();
+  }, 1500);
 }
