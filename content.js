@@ -56,7 +56,7 @@ function renderPanel() {
 
   // First, let's see if our panel already exists on the page.
   let panel = document.getElementById('ddnettube-readonly-panel');
-  
+
   if (!panel) {
     // If it doesn't exist, we create a new div for it.
     panel = document.createElement('div');
@@ -69,26 +69,26 @@ function renderPanel() {
       titleContainer.parentElement.insertBefore(panel, titleContainer.nextSibling);
     } else {
       // If we can't find the title (maybe YouTube changed their layout), we just stop.
-      return; 
+      return;
     }
   }
 
   // Clear out any old content from the panel before we redraw it.
   panel.innerHTML = '';
-  
+
   // If we don't have any data for this video, just hide the panel and stop.
   if (!currentData) {
     panel.style.display = 'none';
     return;
   }
-  
+
   // Otherwise, show the panel!
   panel.style.display = 'block';
 
   // Render categories
   for (const [category, tags] of Object.entries(CATEGORIES)) {
     if (!currentData.tags || !currentData.tags[category] || currentData.tags[category].length === 0) continue;
-    
+
     const row = document.createElement('div');
     row.className = 'ddnettube-row';
 
@@ -180,7 +180,7 @@ function init() {
   // Ask Chrome's local storage for the database of videos
   chrome.storage.local.get(['videos'], (res) => {
     const videos = res.videos || {};
-    
+
     // If our current video is in the database, grab its data!
     if (videos[vid]) {
       currentData = videos[vid];
@@ -235,7 +235,7 @@ if (window.location.hostname.includes('youtube.com')) {
 const hostname = window.location.hostname;
 if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw') || hostname.includes('teerank.io')) {
   let currentTrackerUrl = location.href;
-  
+
   // Just like on YouTube, we watch for URL changes (since DDStats is also a Single Page App).
   new MutationObserver(() => {
     if (location.href !== currentTrackerUrl) {
@@ -245,168 +245,6 @@ if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw') || hostnam
   }).observe(document, { subtree: true, childList: true });
 
   setTimeout(() => initTrackerIntegration(hostname), 500);
-}
-
-// This function figures out what player, map, or clan page we are looking at.
-function initTrackerIntegration(hostname) {
-  // Remove any old badge first.
-  const existing = document.getElementById('teetube-tracker-badge');
-  if (existing) existing.remove();
-
-  const path = window.location.pathname;
-  let type = null;
-  let targetName = null;
-
-  // Let's guess what page the user is on based on the URL!
-  if (hostname.includes('ddnet.org') || hostname.includes('ddstats.tw')) {
-    if (path.startsWith('/players/') || path.startsWith('/player/')) {
-      type = 'player';
-      targetName = decodeURIComponent(path.split('/')[2]);
-    } else if (path.startsWith('/maps/') || path.startsWith('/map/')) {
-      type = 'map';
-      targetName = decodeURIComponent(path.split('/')[2]);
-    }
-  } else if (hostname.includes('teerank.io')) {
-    if (path.startsWith('/player/')) {
-      type = 'player';
-      targetName = decodeURIComponent(path.split('/')[2]);
-    } else if (path.startsWith('/clan/')) {
-      type = 'clan';
-      targetName = decodeURIComponent(path.split('/')[2]);
-    } else if (path.includes('/map/')) {
-      type = 'map';
-      const parts = path.split('/');
-      const mapIdx = parts.indexOf('map');
-      if (mapIdx !== -1 && parts.length > mapIdx + 1) {
-        targetName = decodeURIComponent(parts[mapIdx + 1]);
-      }
-    }
-  }
-
-  // If we couldn't figure it out, stop here.
-  if (!type || !targetName) return;
-
-  // Look through our local database to count how many videos match this player/map/clan.
-  chrome.storage.local.get(['videos'], (res) => {
-    const allVideos = res.videos || {};
-    let matchCount = 0;
-
-    Object.values(allVideos).forEach(v => {
-      const pList = v.players || v.nicknames || [];
-      if (type === 'player' && pList.includes(targetName)) matchCount++;
-      if (type === 'map' && v.maps && v.maps.includes(targetName)) matchCount++;
-      if (type === 'clan' && v.clans && v.clans.includes(targetName)) matchCount++;
-    });
-
-    // Finally, inject the badge onto the page with the result!
-    injectTrackerBanner(type, targetName, matchCount);
-  });
-}
-
-// This function creates the actual HTML element for the tracker badge and inserts it.
-function injectTrackerBanner(type, targetName, matchCount) {
-  const badge = document.createElement('span');
-  badge.id = 'teetube-tracker-badge';
-  badge.title = 'TeeTube';
-
-  const hostname = window.location.hostname;
-  const isDDNet = hostname.includes('ddnet.org');
-  const isDDStats = hostname.includes('ddstats.tw');
-  const isTeeRank = hostname.includes('teerank.io');
-  
-  // Basic inline badge styles
-  badge.style.display = 'inline-block';
-  badge.style.marginLeft = '12px';
-  badge.style.padding = '2px 8px';
-  badge.style.fontSize = '14px';
-  badge.style.fontWeight = 'bold';
-  badge.style.borderRadius = '6px';
-  badge.style.verticalAlign = 'middle';
-  badge.style.lineHeight = '1.5';
-  badge.style.transition = 'all 0.2s';
-
-  if (matchCount > 0) {
-    badge.style.cursor = 'pointer';
-    badge.innerHTML = `📺 ${matchCount} видео`;
-    badge.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      chrome.runtime.sendMessage({ action: 'openDashboard', type, targetName });
-    };
-  } else {
-    badge.style.cursor = 'default';
-    badge.innerHTML = `🚫 0 видео`;
-  }
-
-  if (isDDNet) {
-    if (matchCount > 0) {
-      badge.style.border = '1px solid #ffa500';
-      badge.style.color = '#ffa500';
-      badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
-      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.2)';
-      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
-    } else {
-      badge.style.border = '1px solid #888';
-      badge.style.color = '#888';
-      badge.style.backgroundColor = 'rgba(136, 136, 136, 0.1)';
-    }
-    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
-    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('.block7 h2') || document.querySelector('h2');
-    if (targetEl) targetEl.appendChild(badge);
-  } else if (isDDStats) {
-    if (matchCount > 0) {
-      badge.style.border = '1px solid rgba(46, 204, 113, 0.5)';
-      badge.style.color = '#2ecc71';
-      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
-      badge.onmouseenter = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.25)';
-      badge.onmouseleave = () => badge.style.backgroundColor = 'rgba(46, 204, 113, 0.15)';
-    } else {
-      badge.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-      badge.style.color = '#e0e0ff';
-      badge.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-      badge.style.opacity = '0.7';
-    }
-    const headers = Array.from(document.querySelectorAll('h1, h2, h3, div.text-2xl, span.text-2xl'));
-    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
-    if (targetEl) targetEl.appendChild(badge);
-  } else if (isTeeRank) {
-    if (matchCount > 0) {
-      badge.style.border = '1px solid #34d399';
-      badge.style.color = '#065f46';
-      badge.style.backgroundColor = '#d1fae5';
-      badge.onmouseenter = () => badge.style.backgroundColor = '#a7f3d0';
-      badge.onmouseleave = () => badge.style.backgroundColor = '#d1fae5';
-    } else {
-      badge.style.border = '1px solid #d1d5db';
-      badge.style.color = '#6b7280';
-      badge.style.backgroundColor = '#f3f4f6';
-    }
-    
-    let targetEl = Array.from(document.querySelectorAll('h1')).find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1.text-2xl') || document.querySelector('h1');
-    
-    if (type === 'map') {
-      // TeeRank map pages don't have an h1, so we attach the badge to the breadcrumb link.
-      const links = Array.from(document.querySelectorAll('a'));
-      const breadcrumb = links.find(a => a.textContent.trim().toLowerCase() === targetName.toLowerCase());
-      if (breadcrumb) targetEl = breadcrumb;
-    }
-    
-    if (targetEl) targetEl.appendChild(badge);
-  } else {
-    // Fallback
-    if (matchCount > 0) {
-      badge.style.border = '1px solid #2ecc71';
-      badge.style.color = '#2ecc71';
-      badge.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
-    } else {
-      badge.style.border = '1px solid #ff3232';
-      badge.style.color = '#ff8282';
-      badge.style.backgroundColor = 'rgba(255, 50, 50, 0.2)';
-    }
-    const headers = Array.from(document.querySelectorAll('h1, h2, h3'));
-    const targetEl = headers.find(h => h.textContent.toLowerCase().includes(targetName.toLowerCase())) || document.querySelector('h1, h2');
-    if (targetEl) targetEl.appendChild(badge);
-  }
 }
 
 // --- Thumbnail Badges ---
@@ -434,7 +272,7 @@ chrome.storage.local.get(['videos'], (res) => {
 
 function injectThumbnails() {
   if (document.getElementById('ddnettube-admin-active')) return;
-  
+
   const links = document.querySelectorAll('a[href*="/watch?v="]');
   links.forEach(link => {
     try {
@@ -445,7 +283,7 @@ function injectThumbnails() {
       // Check if it's a thumbnail link (contains an image or has a thumbnail-related class/id)
       const hasImage = link.querySelector('img, yt-image, yt-thumbnail-view-model');
       const isThumbnail = link.id === 'thumbnail' || (typeof link.className === 'string' && (link.className.includes('thumbnail') || link.className.includes('ytLockupViewModelContentImage')));
-      
+
       if (!hasImage && !isThumbnail) {
         // If it's a title link, we might have accidentally added a badge to it previously. Remove it.
         const wrongBadge = link.querySelector('.teetube-saved-badge');
@@ -454,19 +292,19 @@ function injectThumbnails() {
       }
 
       const existingBadge = link.querySelector('.teetube-saved-badge');
-      
+
       if (allVideosCache[vid]) {
-         if (!existingBadge) {
-             const badge = document.createElement('div');
-             badge.className = 'teetube-saved-badge';
-             badge.innerHTML = '✔ teetube';
-             const thumb = link.querySelector('yt-thumbnail-view-model') || link.querySelector('ytd-thumbnail') || link;
-             thumb.appendChild(badge);
-         }
+        if (!existingBadge) {
+          const badge = document.createElement('div');
+          badge.className = 'teetube-saved-badge';
+          badge.innerHTML = '✔ teetube';
+          const thumb = link.querySelector('yt-thumbnail-view-model') || link.querySelector('ytd-thumbnail') || link;
+          thumb.appendChild(badge);
+        }
       } else {
-         if (existingBadge) existingBadge.remove();
+        if (existingBadge) existingBadge.remove();
       }
-    } catch (e) {}
+    } catch (e) { }
   });
 }
 
@@ -481,7 +319,7 @@ function injectChannelBadges() {
     ytd-channel-name .ytContentMetadataViewModelMetadataText,
     #channel-name .ytContentMetadataViewModelMetadataText
   `);
-  
+
   channelEls.forEach(el => {
     try {
       let badge = el.querySelector('.teetube-channel-badge');
@@ -490,10 +328,10 @@ function injectChannelBadges() {
         rawText = rawText.replace(badge.innerText || badge.textContent, '');
       }
       const author = rawText.trim();
-      
+
       if (!author) return;
       const lowerAuthor = author.toLowerCase();
-      
+
       const count = authorCounts[lowerAuthor];
       if (!count) {
         if (badge) badge.remove();
@@ -501,7 +339,7 @@ function injectChannelBadges() {
       }
 
       // badge is already defined above
-      
+
       let badgeText = `✔ teetube (${count} saved)`;
 
       if (!badge) {
@@ -510,7 +348,7 @@ function injectChannelBadges() {
         el.appendChild(badge);
       }
       badge.innerHTML = badgeText;
-    } catch (e) {}
+    } catch (e) { }
   });
 }
 
