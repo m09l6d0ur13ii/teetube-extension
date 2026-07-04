@@ -5,8 +5,8 @@ const DB_URL = 'https://cdn.jsdelivr.net/gh/m09l6d0ur13ii/teetube-db@main/databa
 // This function fetches the latest database from the URL and saves it to local storage.
 async function updateDatabase() {
   try {
-    // We add a timestamp query parameter (?_=...) to try and bypass browser caching
-    const res = await fetch(DB_URL + '?_=' + Date.now());
+    // We use { cache: 'no-cache' } to bypass browser caching and hit the CDN directly
+    const res = await fetch(DB_URL, { cache: 'no-cache' });
     
     // Check if the request was successful
     if (res.ok) {
